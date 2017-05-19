@@ -1,0 +1,11 @@
+{
+    "name": "tbenr/simplesamlphp-module-remote",
+    "description": "HTTP header variables authentication module for simpleSAMLphp",
+    "keywords": [ "remote", "simpleSAMLphp", "HTTP","header" ],
+    "homepage": "https://github.com/tbenr/simplesamlphp-module-remote",
+    "license": "LGPL-2.1",
+    "type": "simplesamlphp-module",
+    "require": {
+        "simplesamlphp/composer-module-installer": "~1.0"
+    }
+}
