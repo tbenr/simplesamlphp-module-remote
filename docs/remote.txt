@@ -1,26 +1,30 @@
-Using the CAS authentication source with SimpleSAMLphp
+Using the REMOTE authentication source with SimpleSAMLphp
 ==========================================================
 
-This is completely based on the original cas authentication, 
-the only diffrence is this is authentication module and not a script.
+simplesaml authentication module allowing authentication based on HTTP Header variables.
 
-Setting up the CAS authentication module
+Setting up the REMOTE authentication module
 ----------------------------------
 
-The first thing you need to do is to enable the cas module:
+The first thing you need to do is to enable the remote module:
 
-    touch modules/cas/enable
+    touch modules/remote/enable
 
 Adding a authentication source
 
 example authsource.php
 ----------------------------------
 
-	'example-cas' => array(
-		'cas:CAS',
-		'cas' => array(
-			'login' => 'https://cas.example.com/login',
-			'validate' => 'https://cas.example.com/validate',
+	'example-remote' => array(
+		'remote:REMOTE',
+		'remote' => array(
+			'authnctxcf' => array(
+				'urn:oasis:names:tc:SAML:2.0:ac:classes:SpidL1' => '/simplesaml/module.php/remote/callback.php/L1',
+				'urn:oasis:names:tc:SAML:2.0:ac:classes:SpidL2' => '/simplesaml/module.php/remote/callback.php/L2',
+				'default' => '/simplesaml/module.php/remote/callback.php/default'
+			),
+			'var_username' => 'SM_USER',
+			'var_userattr_prefix' => 'SM_UA_',
 			'logout' => 'https://cas.example.com/logout'
 		),
 		'ldap' => array(
