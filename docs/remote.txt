@@ -2,6 +2,7 @@ Using the REMOTE authentication source with SimpleSAMLphp
 ==========================================================
 
 simplesaml authentication module allowing authentication based on HTTP Header variables.
+It is based on the CAS module.
 
 Setting up the REMOTE authentication module
 ----------------------------------

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Handle linkback() response from CAS.
+ * receive HTTP Headers from request and call authentication finalStep
  */
 
 if (!isset($_GET['stateID'])) {
