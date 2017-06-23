@@ -19,10 +19,29 @@ example authsource.php
 	'example-remote' => array(
 		'remote:REMOTE',
 		'remote' => array(
-			'authnctxcf' => array(
-				'urn:oasis:names:tc:SAML:2.0:ac:classes:SpidL1' => '/simplesaml/module.php/remote/callback.php/L1',
-				'urn:oasis:names:tc:SAML:2.0:ac:classes:SpidL2' => '/simplesaml/module.php/remote/callback.php/L2',
-				'default' => '/simplesaml/module.php/remote/callback.php/default'
+			'RequestedAuthnContextClassRefGroups' => array (
+				'L1' => array('urn:oasis:names:tc:SAML:2.0:ac:classes:SpidL1','https://www.spid.gov.it/SpidL1'),
+				'L2' => array('urn:oasis:names:tc:SAML:2.0:ac:classes:SpidL2','https://www.spid.gov.it/SpidL2'),
+				'L3' => array('urn:oasis:names:tc:SAML:2.0:ac:classes:SpidL3','https://www.spid.gov.it/SpidL3'),
+			),
+			'RACCRGtoLoginPaths' => array(
+				'L1' => array('session' => true,
+							  'auth_methods' => array(
+													array('label' => 'Method1', 'url' => 'remote/callback.php/L1/M1'),
+													array('label' => 'Method2', 'url' => 'remote/callback.php/L1/M2'),
+												),
+							  ),
+				'L2' => array('session' => false,
+							  'auth_methods' => array(
+													array('label' => 'Method1', 'url' => 'remote/callback.php/L2/M1'),
+													array('label' => 'Method2', 'url' => 'remote/callback.php/L2/M2'),
+												),
+							  ),
+				'default' => array('session' => true,
+							  'auth_methods' => array(
+													array('label' => 'Method1', 'url' => 'remote/callback.php/default'),
+												),
+							  ),
 			),
 			'var_username' => 'SM_USER',
 			'var_userattr_prefix' => 'SM_UA_',

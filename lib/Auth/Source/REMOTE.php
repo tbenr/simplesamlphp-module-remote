@@ -21,6 +21,12 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 
 
 	/**
+	 * The key of the AuthId field in the state.
+	 */
+	const AUTH_GROUP = 'sspmod_remote_Auth_Source_REMOTE.AuthGroup';
+
+
+	/**
 	 * @var array with ldap configuration
 	 */
 	private $_ldapConfig;
@@ -31,18 +37,24 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 	private $_remoteConfig;
 
 	/**
-	 * @var remote chosen validation method
+	 * @var http header variable where to get logged userid (ie. REMOTE_USER)
 	 */
-	private $_validationMethod;
-	/**
-	 * @var remote login method
-	 */
-	private $_loginMethodMapping;
-
 	private $_remoteUser;
+
+	/**
+	 * @var http header variable prefix for user attributes (ie. RUA_)
+	 */
 	private $_remoteUserAttrPrefix;
 	
+	/**
+	 * @var gropus of AuthnContextClassRef for RequestedAuthnContext
+	 */
+	private $_raccrg;
 
+	/**
+	 * @var mapping from RequestedAuthnContextClassRefGroup to array of authentication paths elegible for authenticate
+	 */
+	private $_raccrgToLoginMethods;
 
 	/**
 	 * Constructor for this authentication source.
@@ -69,10 +81,16 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 		$this->_remoteConfig = $config['remote'];
 		$this->_ldapConfig = $config['ldap'];
 
-		if(isset($this->_remoteConfig['authnctxcf'])){
-			$this->_loginMethodMapping =  $this->_remoteConfig['authnctxcf'];
+		if(isset($this->_remoteConfig['RequestedAuthnContextClassRefGroups'])){
+			$this->_raccrg =  $this->_remoteConfig['RequestedAuthnContextClassRefGroups'];
 		}else{
-			throw new Exception("remote login URL not specified");
+			throw new Exception("RequestedAuthnContextClassRefGroups not specified");
+		}
+
+		if(isset($this->_remoteConfig['RACCRGtoLoginMethods'])){
+			$this->_raccrgToLoginMethods =  $this->_remoteConfig['RACCRGtoLoginMethods'];
+		}else{
+			throw new Exception("RACCRGtoLoginMethods not specified");
 		}
 
 		if(isset($this->_remoteConfig['var_username'])){
@@ -90,7 +108,7 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 
 
 	/**
-	 * This the most simple version of validating, this provides only authentication validation
+	 * This function extract user and attributes from passed HTTP header variables
 	 *
 	 * @return list username and attributes
 	 */
@@ -111,7 +129,20 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 	}
 
 
+	/**
+	 * determine AuthnContextClassRefGroup fro a given AuthnContextClassRef
+	 *
+	 * @return AuthnCtx group
+	 */
+	private function getRACCRG($authnctx){
 
+		foreach($this->_raccrg as $group => $actxArray) {
+			assert('is_array($actxArray)');
+			if(in_array($authnctx,$actxArray)) return $group;
+		}
+
+		return null;
+	}
 
 	/**
 	 * Called by linkback, to finish validate/ finish logging in.
@@ -157,29 +188,60 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 		// We are going to need the authId in order to retrieve this authentication source later
 		$state[self::AUTHID] = $this->authId;
 
+		// initialize urls (authentication urls associated to the RequestedAuthnContext Class Ref)
+		$resolved_login_group = array();
+
+		// loop on AuthnContextClassRef searching for matching classes
+		foreach ($state['saml:RequestedAuthnContext']['AuthnContextClassRef'] as $authctx) {
+
+			$grp = $this->getRACCRG($authctx);
+			if(is_null($grp)) continue;
+
+			$login_methods = $this->_raccrgToLoginMethods[$grp];
+			if(isset($login_methods)) break;
+		}
+
+		// if no urls found, get them from default group
+		if(!isset($login_methods)) {
+			$login_methods = $this->_raccrgToLoginMethods['default'];
+		}
+
+		if($login_methods['session']) {
+			$resolved_login_group['session'] = true;
+		}
+		else {
+			$state['as:NoSession'] = true;
+		}
+
+		$resolved_login_group['auth_methods'] = array();
+
+		// resolve module urls
+		foreach($login_methods['auth_methods'] as $method) {
+			$method['url'] = SimpleSAML_Module::getModuleURL($method['url']);
+
+			array_push($resolved_login_group['auth_methods'],$method);
+		}
+
+
+		// save calculated urls in state
+		$state[self::AUTH_GROUP] = $resolved_login_group;
+
 		$stateID = SimpleSAML_Auth_State::saveState($state, self::STAGE_INIT);
 
 
-
-		$serviceUrl = SimpleSAML_Module::getModuleURL('remote/callback.php');
-
-		$resolved_login_url = null;
-
-		foreach ($state['saml:RequestedAuthnContext']['AuthnContextClassRef'] as $authctx) {
-			
-			$resolved_login_url=$this->_loginMethodMapping[$authctx];
-			if(isset($resolved_login_url)) break;
-			
-		}
-
-		if(!isset($resolved_login_url)) {
-			$resolved_login_url = $this->_loginMethodMapping['default'];
-		}
-
-
-		\SimpleSAML\Utils\HTTP::redirectTrustedURL($resolved_login_url, array('stateID' => $stateID));
+		// redirect user to login
+		\SimpleSAML\Utils\HTTP::redirectTrustedURL(SimpleSAML_Module::getModuleURL('remote/authstarter.php'), array('stateID' => $stateID));
 	}
 
+ public function reauthenticate(array &$state)
+    {
+		if(isset($state['remote:headers'])) {
+			return parent::reauthenticate($state);
+		}
+
+		// always reauthenticate => we want to always go through secure reverse proxy to get HTTP headers
+		$state['as:Reauth'] = true;
+	}
 
 	/**
 	 * Log out from this authentication source.

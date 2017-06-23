@@ -7,10 +7,28 @@
 if (!isset($_GET['stateID'])) {
 	throw new SimpleSAML_Error_BadRequest('Missing stateID parameter.');
 }
+
+/**
+* check if we need to exit iframe
+* folowing javascript will reload the page even if we are not in an iframe.
+*/
+if (!isset($_GET['uniframed'])) {
+?>
+<script type="text/javascript">
+    window.top.location.href = window.location.href + '&uniframed=yes'; 
+</script>
+...please wait...
+<?php
+	exit;
+}
+
+/**
+ * now we are on the top window, proceed with authentication
+ */
+
 $state = SimpleSAML_Auth_State::loadState($_GET['stateID'], sspmod_remote_Auth_Source_REMOTE::STAGE_INIT);
 
 $state['remote:headers'] = getallheaders();
-
 
 // Find authentication source
 assert('array_key_exists(sspmod_remote_Auth_Source_REMOTE::AUTHID, $state)');

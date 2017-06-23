@@ -1,0 +1,8 @@
+{
+	"select_source_header": {
+		"it": "Selezionare una fonte di autenticazione"
+	},
+	"select_source_text": {
+		"it": "La fonte di autenticazione selezionata verr\u00e0 usata per autenticarti e creare una sessione valida."
+	}
+}
