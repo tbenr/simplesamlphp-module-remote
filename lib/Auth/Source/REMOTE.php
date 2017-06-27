@@ -42,9 +42,9 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 	private $_remoteUser;
 
 	/**
-	 * @var http header variable prefix for user attributes (ie. RUA_)
+	 * @var http header variable mapping for user attributes
 	 */
-	private $_remoteUserAttrPrefix;
+	private $_remoteUserAttrMap;
 	
 	/**
 	 * @var gropus of AuthnContextClassRef for RequestedAuthnContext
@@ -93,16 +93,16 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 			throw new Exception("RACCRGtoLoginMethods not specified");
 		}
 
-		if(isset($this->_remoteConfig['var_username'])){
-			$this->_remoteUser =  $this->_remoteConfig['var_username'];
+		if(isset($this->_remoteConfig['http_var_username'])){
+			$this->_remoteUser =  $this->_remoteConfig['http_var_username'];
 		}else{
-			throw new Exception("var_username not specified");
+			throw new Exception("http_var_username not specified");
 		}
 
-		if(isset($this->_remoteConfig['var_userattr_prefix'])){
-			$this->_remoteUserAttrPrefix =  $this->_remoteConfig['var_userattr_prefix'];
+		if(isset($this->_remoteConfig['http_var_mapping'])){
+			$this->_remoteUserAttrMap =  $this->_remoteConfig['http_var_mapping'];
 		}else{
-			throw new Exception("var_userattr_prefix not specified");
+			throw new Exception("http_var_mapping not specified");
 		}
 	}
 
@@ -115,13 +115,15 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 	private function remoteValidation($headers){
 		$user = $headers[$this->_remoteUser];
 
+		if(!isset($user)) throw new Exception("cannot find user header variable");
+
 		$attrs = array();
 
 		foreach($headers as $key => $value) {
-			if(substr($key, 0, strlen($this->_remoteUserAttrPrefix)) === $this->_remoteUserAttrPrefix) {
-				$attr = substr($key,strlen($this->_remoteUserAttrPrefix));
-
-				$attrs[$attr] = $value;
+			// check if current http header name is present in mapping
+			if(isset($this->_remoteUserAttrMap[$key])) {
+				// if yes, add it in attribute array
+				$attrs[$this->_remoteUserAttrMap[$key]] = $value;
 			}
 		}
 
