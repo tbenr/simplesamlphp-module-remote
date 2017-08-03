@@ -24,24 +24,30 @@ example authsource.php
 				'L2' => array('urn:oasis:names:tc:SAML:2.0:ac:classes:SpidL2','https://www.spid.gov.it/SpidL2'),
 				'L3' => array('urn:oasis:names:tc:SAML:2.0:ac:classes:SpidL3','https://www.spid.gov.it/SpidL3'),
 			),
-			'RACCRGtoLoginPaths' => array(
+			'AuthnGroupsConfig' => array(
 				'L1' => array('session' => true,
+							  'label_tag' => '{remote:spid:label_spidL1}',
+							  'AuthnContextClassRef' => 'urn:oasis:names:tc:SAML:2.0:ac:classes:SpidL1',
 							  'auth_methods' => array(
-													array('label' => 'Method1', 'url' => 'remote/callback.php/L1/M1'),
-													array('label' => 'Method2', 'url' => 'remote/callback.php/L1/M2'),
+													array(label_tag => '{remote:spid:label_M1}', 'url' => 'remote/callback.php/L1/M1'),
+													array(label_tag => '{remote:spid:label_M3}', 'url' => 'remote/callback.php/L1/M3'),
 												),
 							  ),
 				'L2' => array('session' => false,
+							  label_tag => '{remote:spid:label_spidL2}',
+							  'AuthnContextClassRef' => 'urn:oasis:names:tc:SAML:2.0:ac:classes:SpidL2',
 							  'auth_methods' => array(
-													array('label' => 'Method1', 'url' => 'remote/callback.php/L2/M1'),
-													array('label' => 'Method2', 'url' => 'remote/callback.php/L2/M2'),
+													array(label_tag => '{remote:spid:label_M2}', 'url' => 'remote/callback.php/L2/M2'),
+													array(label_tag => '{remote:spid:label_M3}', 'url' => 'remote/callback.php/L2/M3'),
 												),
 							  ),
 				'default' => array('session' => true,
+							  label_tag => '{remote:spid:label_spidDEFAULT}',
 							  'auth_methods' => array(
-													array('label' => 'Method1', 'url' => 'remote/callback.php/default'),
+													array(label_tag => '{remote:spid:label_M3}', 'url' => 'remote/callback.php/default'),
 												),
 							  ),
+				/* 'default' => array('error' => 'error'),
 			),
 			'http_var_username' => 'SM_USER',
 			'http_var_mapping' => array(
