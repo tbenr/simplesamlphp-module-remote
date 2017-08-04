@@ -47,7 +47,12 @@ example authsource.php
 													array(label_tag => '{remote:spid:label_M3}', 'url' => 'remote/callback.php/default'),
 												),
 							  ),
-				/* 'default' => array('error' => 'error'),
+				/* 'default' => array('error' => array(
+						'status' => 'urn:oasis:names:tc:SAML:2.0:status:Requester',
+						'subStatus' => 'urn:oasis:names:tc:SAML:2.0:statuss:NoAuthnContext',
+						'statusMessage' => 'ErrorCode nr12',
+					)
+				),*/
 			),
 			'http_var_username' => 'SM_USER',
 			'http_var_mapping' => array(
@@ -69,7 +74,37 @@ example authsource.php
 					'SM_UA_EXPIRATIONDATE' => 'expirationDate',
 					'SM_UA_DIGITALADDRESS' => 'digitalAddress',
 			),
-			'logout' => 'https://cas.example.com/logout'
+			'logout' => 'https://cas.example.com/logout',
+			'errorhandler' => array(
+				'parameterName' => 'SMAUTHREASON',
+				'mapping' => array(
+					'24' => array( // ripetuta sottomissione
+						'status' => 'urn:oasis:names:tc:SAML:2.0:status:Requester',
+						'subStatus' => 'urn:oasis:names:tc:SAML:2.0:status:AuthnFailed',
+						'statusMessage' => 'ErrorCode nr19',
+					),
+					'98' => array( // timeout autenticazione
+						'status' => 'urn:oasis:names:tc:SAML:2.0:status:Requester',
+						'subStatus' => 'urn:oasis:names:tc:SAML:2.0:statuss:NoAuthnContext',
+						'statusMessage' => 'ErrorCode nr21',
+					),
+					'7' => array( // utente sospeso o bloccato
+						'status' => 'urn:oasis:names:tc:SAML:2.0:status:Requester',
+						'subStatus' => 'urn:oasis:names:tc:SAML:2.0:statuss:NoAuthnContext',
+						'statusMessage' => 'ErrorCode nr23',
+					),	
+					'100' => array( //utente privo di credenziali
+						'status' => 'urn:oasis:names:tc:SAML:2.0:status:Requester',
+						'subStatus' => 'urn:oasis:names:tc:SAML:2.0:statuss:NoAuthnContext',
+						'statusMessage' => 'ErrorCode nr20',
+					),	
+					'95' => array(
+						'status' => 'urn:oasis:names:tc:SAML:2.0:status:Requester',
+						'subStatus' => 'urn:oasis:names:tc:SAML:2.0:statuss:NoAuthnContext',
+						'statusMessage' => 'ErrorCode nr12',
+					),		
+				)
+			),
 		),
 		'ldap' => array(
 			'servers' => 'ldaps://ldaps.example.be:636/',

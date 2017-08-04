@@ -12,7 +12,7 @@ if (!array_key_exists('stateID', $_REQUEST)) {
 	throw new SimpleSAML_Error_BadRequest('Missing stateID parameter.');
 }
 $stateID = $_REQUEST['stateID'];
-$state = SimpleSAML_Auth_State::loadState($stateID, sspmod_remote_Auth_Source_REMOTE::STATEID);
+$state = SimpleSAML_Auth_State::loadState($stateID, sspmod_remote_Auth_Source_REMOTE::STAGE);
 
 $globalConfig = SimpleSAML_Configuration::getInstance();
 $t = new SimpleSAML_XHTML_Template($globalConfig, 'remote:authstarter.php');

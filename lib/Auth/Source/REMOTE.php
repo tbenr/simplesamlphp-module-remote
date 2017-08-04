@@ -12,7 +12,7 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 	/**
 	 * The string used to identify our states.
 	 */
-	const STATEID = 'sspmod_remote_Auth_Source_REMOTE.state';
+	const STAGE = 'sspmod_remote_Auth_Source_REMOTE.stage';
 
 	/**
 	 * The key of the AuthId field in the state.
@@ -58,6 +58,16 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 	 * @var mapping from RequestedAuthnContextClassRefGroup to array of authentication paths elegible for authenticate
 	 */
 	private $_authnGroupsConfig;
+
+	/**
+	 * @var error handler Parameter Name
+	 */
+	private $_errorHandler_parameterName;
+
+	/**
+	 * @var error handler mapping
+	 */
+	private $_errorHandler_mapping;
 
 	/**
 	 * Constructor for this authentication source.
@@ -110,6 +120,26 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 			throw new Exception("http_var_username not specified");
 		}
 
+		if(isset($this->_remoteConfig['errorhandler'])){
+			$errorhandler = $this->_remoteConfig['errorhandler'];
+
+			if(isset($errorhandler['parameterName'])) {
+				$this->_errorHandler_parameterName = $errorhandler['parameterName'];
+			} else {
+				throw new Exception("errorhandler parameter name not specified");
+			}
+
+			if(isset($errorhandler['mapping'])) {
+				$this->_errorHandler_mapping = $errorhandler['mapping'];
+			} else {
+				throw new Exception("errorhandler mapping not specified");
+			}
+
+			$this->_remoteUserAttrMap = $this->_remoteConfig['errorhandler'];
+		}else{
+			throw new Exception("errorhandler not specified");
+		}
+
 		if(isset($this->_remoteConfig['http_var_mapping'])){
 			$this->_remoteUserAttrMap = $this->_remoteConfig['http_var_mapping'];
 		}else{
@@ -148,12 +178,16 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 		}
 
 		if (!$found) {
-			throw new Exception("Authentication callbackURI non corresponding to any of the Authn Method for the current AuthnGroup");
+			SimpleSAML_Auth_State::throwException($state,
+    			new SimpleSAML_Error_Exception('Authentication callbackURI non corresponding to any of the Authn Method for the current AuthnGroup'));
 		}
 
 		$user = $headers[$this->_remoteUser];
 		
-		if(!isset($user)) throw new Exception("cannot find user header variable");
+		if(!isset($user)) {
+			SimpleSAML_Auth_State::throwException($state,
+    			new SimpleSAML_Error_Exception('Cannot find user header variable'));
+		}
 
 		$attrs = array();
 
@@ -243,8 +277,19 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 		}
 
 		// if no urls found, get them from default group
-		if(!isset($selectedGroup)) {
+		if (!isset($selectedGroup)) {
 			$selectedGroup = $this->_authnGroupsConfig['default'];
+		}
+
+		// check if selected group should throw an error
+		if (array_key_exists('error',$selectedGroup)) {
+			$error = $selectedGroup['error'];
+			if(is_array($error)) {
+				throw new sspmod_saml_Error($error['status'], $error['subStatus'], $error['statusMessage']);
+			} else {
+				throw new SimpleSAML_Error_Exception($error);
+			}
+			
 		}
 
 		// determine returned AuthnContext
@@ -258,7 +303,9 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 		$state[self::AUTH_GROUP] = $selectedGroup;
 		$state[self::AUTH_GROUPID] = $selectedGroupID;
 
-		$stateID = SimpleSAML_Auth_State::saveState($state, self::STATEID);
+		$stateID = SimpleSAML_Auth_State::saveState($state, self::STAGE);
+
+		self::setStateInCookie($stateID);
 
 		// redirect user to login
 		\SimpleSAML\Utils\HTTP::redirectTrustedURL(SimpleSAML_Module::getModuleURL('remote/authstarter.php'), array('stateID' => $stateID));
@@ -317,7 +364,7 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 			'httponly' => FALSE,
 		);
 
-        \SimpleSAML\Utils\HTTP::setCookie($cookieName, $source, $params, FALSE);
+        \SimpleSAML\Utils\HTTP::setCookie($cookieName, $method, $params, FALSE);
 	}
 
 	/**
@@ -336,4 +383,64 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 			return NULL;
 		}
 	}
+
+
+	/**
+	* Save current stateID in cookie, to manage get resume state when authentication methods return error to error handler
+	*
+	*
+	* @param string $stateID current auth state.
+	*/
+	public static function setStateInCookie($stateID) {
+		assert('is_string($state)');
+
+		$cookieName = 'remote_method_state';
+
+		$config = SimpleSAML_Configuration::getInstance();
+		$params = array(
+			/* The base path for cookies.
+			This should be the installation directory for SimpleSAMLphp. */
+			'path' => $config->getBasePath(), // . 'module.php/remote',
+			'httponly' => TRUE,
+			//'secure' => TRUE,
+		);
+
+        \SimpleSAML\Utils\HTTP::setCookie($cookieName, $stateID, $params, FALSE);
+	}
+
+
+	/**
+	* get current stateID from cookie, to manage get resume state when authentication methods return error to error handler
+	*
+	*/
+	public static function getStateFromCookie() {
+		assert('is_string($state)');
+
+		$cookieName = 'remote_method_state';
+
+		if(array_key_exists($cookieName, $_COOKIE)) {
+			return $_COOKIE[$cookieName];
+		} else {
+			return NULL;
+		}
+	}
+
+
+	public function handleError(&$state) {
+
+		$errorKey = $_GET[$this->_errorHandler_parameterName];
+
+		if(isset($errorKey)) {
+
+			$error = $this->_errorHandler_mapping[$errorKey];
+
+			if(isset($error)) {
+				SimpleSAML_Auth_State::throwException($state,
+    				new sspmod_saml_Error($error['status'], $error['subStatus'], $error['statusMessage']));
+			}
+		}
+    	
+		throw new Exception("Unhandled error parameter");
+	}
+
 }
