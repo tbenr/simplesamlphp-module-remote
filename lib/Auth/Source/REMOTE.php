@@ -294,9 +294,9 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 
 		// determine returned AuthnContext
 		if (array_key_exists('AuthnContextClassRef', $selectedGroup)) {
-			$state['AuthnContextClassRef'] = $selectedGroup['AuthnContextClassRef'];
+			$state['saml:AuthnContextClassRef'] = $selectedGroup['AuthnContextClassRef'];
 		} else {
-			$state['AuthnContextClassRef'] = $selectedRACCR;
+			$state['saml:AuthnContextClassRef'] = $selectedRACCR;
 		}
 
 		// save group and groupID in state
