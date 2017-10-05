@@ -1,12 +1,20 @@
 <?php
 $this->data['header'] = $this->t($this->data['auth_group']['label_tag']);
-$this->includeAtTemplateBase('remote:includes/header.php');
+$this->data['jquery'] = array('core' => TRUE, 'ui' => TRUE, 'css' => TRUE);
+$this->includeAtTemplateBase('includes/header.php');
 
 $auth_methods = $this->data['auth_group']['auth_methods'];
 $auth_preferred_method = $this->data['preferred'];
 ?>
 
 <script type="text/javascript">
+window.addEventListener("message", receiveMessage, false);
+
+function receiveMessage(event)
+{
+    window.location.href = event.data;
+}
+
 var default_tab = 0;
 
 var urls  = [];
@@ -15,8 +23,8 @@ $cnt = 0;
 foreach($auth_methods as $auth_method) {
     echo 'urls.push(\'' . $auth_method['url'] . '?stateID=' . $this->data['stateid'] . '\');';
     echo "\n";
-    if($auth_method['label_tag'] == $auth_preferred_method) {
-        echo 'default_tab = . $cnt . ;';
+    if($cnt == $auth_preferred_method) {
+        echo 'default_tab = ' . $cnt . ';';
         echo "\n";
     }
     $cnt++;
@@ -29,7 +37,7 @@ function startiframe(tabid) {
     ifrm.attr('src', urls[tabid]);
 }
 function activateTab(tabid) {
-     $('.nav-tabs a[href="#tab' + tabid + '"]').tab('show');
+    $( "#tabs" ).tabs( "select", tabid );
 }
 function start_nondefault_iframe() {
     urls.forEach(function(item, index) {
@@ -38,53 +46,48 @@ function start_nondefault_iframe() {
 }
 
 $(function(){
+    $( "#tabs" ).tabs();
     activateTab(default_tab);
     startiframe(default_tab);
-    setTimeout(start_nondefault_iframe,10000);
+    //setTimeout(start_nondefault_iframe,10000);
 
-    $('.nav-tabs a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
-        var id = $(e.target).data('tid'); // activated tab id
-        startiframe(id);
-    });
+    $( "#tabs" ).on( "tabsselect", function( event, ui ) {
+        startiframe(ui.tab.dataset.tid);
+    } );
+
 });
 </script>
 
-<div class="panel with-nav-tabs panel-default">
-    <div class="panel-heading">
-            <ul class="nav nav-tabs">
+<div id="tabs">
+        <ul>
 <?php
 $cnt = 0;
 foreach($auth_methods as $auth_method) {
 ?>
-            <li><a href="#tab<?php echo $cnt; ?>" data-toggle="tab" data-tid="<?php echo $cnt; ?>"><?php echo $this->t($auth_method['label_tag']); ?></a></li>
-
+            <li><a href="#tab<?php echo $cnt; ?>" data-tid="<?php echo $cnt; ?>"><?php echo $this->t($auth_method['label_tag']); ?></a></li>
 <?php
 $cnt++;
 }
 ?>            
-    </div>
-    <div class="panel-body">
-        <div class="tab-content">
+    </ul>
 
 <?php
 $cnt = 0;
 foreach($auth_methods as $auth_method) {
 ?>
-            <div class="tab-pane fade" id="tab<?php echo $cnt; ?>">
-            <iframe frameborder="0" seamless="seamless" style="height: 335px;" class="center-block" width="100%" marginheight="0">
+            <div id="tab<?php echo $cnt; ?>">
+            <iframe frameborder="0" seamless="seamless" style="height: 435px;" class="center-block" width="100%" marginheight="0">
             </iframe>
             </div>
-
 <?php
 $cnt++;
  }
 ?>
 
-
-        </div>
-    </div>
 </div>
 
 
  <?php
- $this->includeAtTemplateBase('remote:includes/footer.php');
+
+ 
+$this->includeAtTemplateBase('includes/footer.php');

@@ -30,6 +30,16 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 	const AUTH_GROUPID = 'sspmod_remote_Auth_Source_REMOTE.AuthGroupID';
 
 	/**
+	 * Selected Auth IDX Method for the current Group ID config in the state.
+	 */
+	 const AUTH_METHODIDX = 'sspmod_remote_Auth_Source_REMOTE.MethodIDX';
+
+	/**
+	 * Track if remote authentication is done (callback called).
+	 */
+	 const AUTH_DONE = 'sspmod_remote_Auth_Source_REMOTE.AuthDone';
+
+	/**
 	 * @var array with ldap configuration
 	 */
 	private $_ldapConfig;
@@ -69,6 +79,26 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 	 */
 	private $_errorHandler_mapping;
 
+	/** 
+	 * utility functions
+	 *
+	 */
+	private function startsWith($haystack, $needle)
+	{
+		 $length = strlen($needle);
+		 return (substr($haystack, 0, $length) === $needle);
+	}
+
+	private static function endsWith($haystack, $needle)
+	{
+		$length = strlen($needle);
+		if ($length == 0) {
+			return true;
+		}
+
+		return (substr($haystack, -$length) === $needle);
+	}
+
 	/**
 	 * Constructor for this authentication source.
 	 *
@@ -106,7 +136,9 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 			// convert relative path to absolute path based on the current module
 			foreach($this->_authnGroupsConfig as &$grpconfig) {
 				foreach($grpconfig['auth_methods'] as &$method) {
-					$method['url'] = SimpleSAML_Module::getModuleURL($method['url']);
+					if(!self::startsWith($method['url'],'http')) {
+						$method['url'] = SimpleSAML_Module::getModuleURL($method['url']);
+					}
 				}
 			}
 
@@ -147,37 +179,29 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 		}
 	}
 
-
-	private static function endsWith($haystack, $needle)
-	{
-		$length = strlen($needle);
-		if ($length == 0) {
-			return true;
-		}
-
-		return (substr($haystack, -$length) === $needle);
-	}
-
 	/**
 	 * This function validate the state by:
 	 * verifing the state consistency
 	 *
 	 * @return list username and attributes
 	 */
-	private function remoteValidation($state, $headers, $callbackURI){
+	private function remoteValidation(&$state, &$headers, $callbackURI){
 
 		// check that callback is compatible with the current authentication group.
 		$authnGrp = $state[self::AUTH_GROUP];
+		$authnGrpId = $state[self::AUTH_GROUPID];
 
-		$found = false;
-		foreach($authnGrp['auth_methods'] as $authmethod) {
-			if (self::endsWith($authmethod['url'],$callbackURI)) {
-				$found = true;
+		$state[self::AUTH_METHODIDX] = -1;
+		$arrlength = count($authnGrp['auth_methods']);
+		
+		for($x = 0; $x < $arrlength; $x++) {
+			if (self::endsWith($authnGrp['auth_methods'][$x]['url'],$callbackURI)) {
+				$state[self::AUTH_METHODIDX] = $x;
 				break;
 			}
 		}
 
-		if (!$found) {
+		if ($state[self::AUTH_METHODIDX] == -1) {
 			SimpleSAML_Auth_State::throwException($state,
     			new SimpleSAML_Error_Exception('Authentication callbackURI non corresponding to any of the Authn Method for the current AuthnGroup'));
 		}
@@ -219,16 +243,29 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 	}
 
 	/**
-	 * function performing final authentication step. Called from frontend
+	 * function performing final authentication step. Called from frontend.
+	 * this actually completes the authentication
+	 *
+ 	 * @param string $state authentication state.
+	 */
+	public function finalStep(&$state) {
+		// save authentication method
+		$this->setPreviousAuth($state[self::AUTH_GROUPID],$state[self::AUTH_METHODIDX]);
+
+		SimpleSAML_Auth_Source::completeAuth($state);
+	}
+
+	/**
+	 * function performing callback authentication step. Called from frontend.
 	 *
  	 * @param string $state authentication state.
 	 * @param array &$headers HTTP headers from request
 	 * @param string &$callbackURI callbackURI used to perform authentication
 	 *
-	 * @return list username, and attributes
+	 * @return new StateID
 	 */
-	public function finalStep(&$state, &$headers, &$callbackURI) {
-
+	 public function callbackStep(&$state, &$headers, &$callbackURI) {
+		
 		//perform validation and obtain user info
 		list($username, $remoteattributes) = $this->remoteValidation($state, $headers, $callbackURI);
 
@@ -249,9 +286,8 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 
 		$state['Attributes'] = $attributes;
 
-		SimpleSAML_Auth_Source::completeAuth($state);
+		return SimpleSAML_Auth_State::saveState($state, self::STAGE);
 	}
-
 
 	/**
 	 * Log-in using remote
@@ -344,11 +380,11 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 	*
 	* This method remembers, for a given group, the authentication method the user selected
 	* by storing its name in a cookie.
-	*
-	* @param string $method the user selected.
+
 	* @param string $group id of the method the user selected.
+	* @param int $method_idx method index for the given group, the user has used for auth.
 	*/
-	public function setPreviousAuth($method, $group) {
+	public function setPreviousAuth($group, $method_idx) {
 		assert('is_string($method)');
 		assert('is_string($group)');
 
@@ -364,23 +400,26 @@ class sspmod_remote_Auth_Source_REMOTE  extends SimpleSAML_Auth_Source  {
 			'httponly' => FALSE,
 		);
 
-        \SimpleSAML\Utils\HTTP::setCookie($cookieName, $method, $params, FALSE);
+        \SimpleSAML\Utils\HTTP::setCookie($cookieName, strval($method_idx), $params, FALSE);
 	}
 
 	/**
 	* Get the previous authentication method for a given group.
 	*
-	* This method retrieves the authentication method that the user selected
+	* This method retrieves the authentication method index that the user selected
 	* last time for the same authn group, or NULL if this is the first time or remembering is disabled.
+	*
+	* @param string $group id of the method the user selected.
+	* @return method idx
 	*/
 	public function getPreviousAuth($group) {
 		assert('is_string($group)');
 
 		$cookieName = 'remote_method_' . $this->authId . '_' . $group;
 		if(array_key_exists($cookieName, $_COOKIE)) {
-			return $_COOKIE[$cookieName];
+			return intval($_COOKIE[$cookieName]);
 		} else {
-			return NULL;
+			return -1;
 		}
 	}
 

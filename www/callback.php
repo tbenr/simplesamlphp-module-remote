@@ -1,5 +1,4 @@
 <?php
-
 /* support for nginx\fpm */
 if (!function_exists('getallheaders')) 
 { 
@@ -25,29 +24,27 @@ if (!isset($_GET['stateID'])) {
 	throw new SimpleSAML_Error_BadRequest('Missing stateID parameter.');
 }
 
-/**
-* check if we need to exit iframe
-* folowing javascript will reload the page even if we are not in an iframe.
-*/
-if (!isset($_GET['uniframed'])) {
+$finish_target = SimpleSAML_Module::getModuleURL('remote/finish.php');
+
+$finish_target_parsed = parse_url($finish_target);
+$message_dest_origin = $finish_target_parsed['scheme'] . '://' . $finish_target_parsed['host'];
+
+
+$state = SimpleSAML_Auth_State::loadState($_GET['stateID'], sspmod_remote_Auth_Source_REMOTE::STAGE);
+if(array_key_exists(sspmod_remote_Auth_Source_REMOTE::AUTH_DONE,$state)) {
 ?>
-<script type="text/javascript">
-    window.top.location.href = window.location.href + '&uniframed=yes'; 
-</script>
-...please wait...
+...an authentication process is already running...
 <?php
 	exit;
 }
 
-/**
- * now we are on the top window, proceed with authentication
- */
+$state[sspmod_remote_Auth_Source_REMOTE::AUTH_DONE] = TRUE;
 
-$state = SimpleSAML_Auth_State::loadState($_GET['stateID'], sspmod_remote_Auth_Source_REMOTE::STAGE);
 
 $headers = getallheaders();
 $uri_parts = explode('?', $_SERVER['REQUEST_URI'], 2);
 $callbackURI = $uri_parts[0];
+$callbackQS = $uri_parts[1];
 
 // Find authentication source
 assert('array_key_exists(sspmod_remote_Auth_Source_REMOTE::AUTHID, $state)');
@@ -58,6 +55,19 @@ if ($source === NULL) {
 	throw new Exception('Could not find authentication source with id ' . $sourceId);
 }
 
-$source->finalStep($state, $headers, $callbackURI);
+$stateID = $source->callbackStep($state, $headers, $callbackURI);
 
-
+/**
+* folowing javascript will redirect to final page exiting from iframe if needed.
+*/
+?>
+<script type="text/javascript">
+	if(window.self !== window.top) {
+		parent.postMessage('<?php echo $finish_target . '?' . $callbackQS; ?>','<?php echo $message_dest_origin; ?>');
+	}
+	else {
+		window.location.href = '<?php echo $finish_target . '?' . $callbackQS; ?>';
+	}
+</script>
+...please wait...
+	

@@ -29,9 +29,8 @@ $as = SimpleSAML_Auth_Source::getById($sourceId);
 if ($as !== NULL) {
 	$t->data['preferred'] = $as->getPreviousAuth( $state[sspmod_remote_Auth_Source_REMOTE::AUTH_GROUPID] );
 } else {
-	$t->data['preferred'] = NULL;
+	$t->data['preferred'] = -1;
 }
-$t->data['hideLanguageBar'] = TRUE;
 
 
 $t->show();
